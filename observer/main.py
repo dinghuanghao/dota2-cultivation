@@ -34,6 +34,29 @@ class MatchObserver:
         players = self.db.get_active_players()
         return [p.account_id for p in players]
 
+    async def update_player_profile(self, account_id: int):
+        """Update player profile information."""
+        try:
+            player = self.db.get_player(account_id)
+            if not player:
+                return
+                
+            # Check if update is needed
+            now = datetime.now()
+            if (player.last_profile_update and 
+                (now - player.last_profile_update).total_seconds() < 
+                self.config.PROFILE_UPDATE_INTERVAL):
+                return
+                
+            # Update profile
+            player_info = await self.api.get_player_info(account_id)
+            self.db.update_player_profile(account_id, player_info)
+            self.logger.info(
+                f"Updated profile for player {account_id} "
+                f"({player_info.get('profile', {}).get('personaname', 'Unknown')})"
+            )
+        except Exception as e:
+            self.logger.error(f"Failed to update profile for player {account_id}: {e}")
 
 
     async def initialize_player(self, account_id: int):
@@ -132,6 +155,10 @@ class MatchObserver:
         try:
             players = self.get_players()
             for player_id in players:
+                # Update player profile
+                await self.update_player_profile(player_id)
+                
+                # Check for new matches
                 self.logger.info(f"Checking new matches for player {player_id}")
                 matches = await self.api.get_player_matches(player_id, limit=50)
                 filtered_matches = self.filter_matches(matches)

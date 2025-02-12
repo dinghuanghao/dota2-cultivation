@@ -1,9 +1,9 @@
 """Database operations for the Dota 2 match observer."""
+import json
 import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
 import logging
-import json
 from typing import Optional, Dict, Any, List
 from datetime import datetime
 
@@ -48,24 +48,50 @@ class Database:
             return cursor.fetchone() is not None
 
     def add_player(self, account_id: int, player_info: Dict[str, Any]) -> Player:
-        """Add a player to monitor."""
+        """Add or update a player to monitor."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
             profile = player_info.get("profile", {})
+            
+            # Try to update existing player first
             cursor.execute(
-                """INSERT INTO players (
-                    account_id, profile_name, avatar_url, rank_tier,
-                    leaderboard_rank, profile_data
-                ) VALUES (?, ?, ?, ?, ?, ?)""",
+                """UPDATE players 
+                SET profile_name = ?,
+                    avatar_url = ?,
+                    rank_tier = ?,
+                    leaderboard_rank = ?,
+                    profile_data = ?,
+                    updated_at = ?,
+                    active = TRUE
+                WHERE account_id = ?""",
                 (
-                    account_id,
                     profile.get("personaname"),
                     profile.get("avatarfull"),
                     player_info.get("rank_tier"),
                     player_info.get("leaderboard_rank"),
-                    json.dumps(player_info)
+                    json.dumps(player_info),
+                    datetime.now(),
+                    account_id
                 )
             )
+            
+            # If no rows were updated, insert new player
+            if cursor.rowcount == 0:
+                cursor.execute(
+                    """INSERT INTO players (
+                        account_id, profile_name, avatar_url, rank_tier,
+                        leaderboard_rank, profile_data
+                    ) VALUES (?, ?, ?, ?, ?, ?)""",
+                    (
+                        account_id,
+                        profile.get("personaname"),
+                        profile.get("avatarfull"),
+                        player_info.get("rank_tier"),
+                        player_info.get("leaderboard_rank"),
+                        json.dumps(player_info)
+                    )
+                )
+            
             conn.commit()
             return self.get_player(account_id)
 
@@ -109,6 +135,34 @@ class Database:
                     updated_at = ?
                 WHERE account_id = ?""",
                 (datetime.now(), account_id)
+            )
+            conn.commit()
+
+    def update_player_profile(self, account_id: int, player_info: Dict[str, Any]):
+        """Update player profile information."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            profile = player_info.get("profile", {})
+            cursor.execute(
+                """UPDATE players 
+                SET profile_name = ?,
+                    avatar_url = ?,
+                    rank_tier = ?,
+                    leaderboard_rank = ?,
+                    profile_data = ?,
+                    last_profile_update = ?,
+                    updated_at = ?
+                WHERE account_id = ?""",
+                (
+                    profile.get("personaname"),
+                    profile.get("avatarfull"),
+                    player_info.get("rank_tier"),
+                    player_info.get("leaderboard_rank"),
+                    json.dumps(player_info),
+                    datetime.now(),
+                    datetime.now(),
+                    account_id
+                )
             )
             conn.commit()
 

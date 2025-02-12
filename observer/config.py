@@ -10,6 +10,7 @@ class Config:
     DATABASE_PATH: Path = Path(__file__).parent / "matches.db"
     POLLING_INTERVAL: int = 60  # seconds between player checks
     QUEUE_PROCESS_INTERVAL: int = 2  # seconds between queue items
+    PROFILE_UPDATE_INTERVAL: int = 3600  # seconds between profile updates
     MAX_RETRIES: int = 3
     RETRY_DELAY: int = 5  # seconds
     OPENDOTA_BASE_URL: str = "https://api.opendota.com/api"

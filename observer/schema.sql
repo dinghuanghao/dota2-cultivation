@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS players (
     account_id INTEGER PRIMARY KEY,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_profile_update TIMESTAMP,
     active BOOLEAN DEFAULT TRUE,
     profile_name TEXT,
     avatar_url TEXT,

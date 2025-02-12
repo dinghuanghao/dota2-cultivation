@@ -48,6 +48,7 @@ class Player:
     account_id: int
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
+    last_profile_update: Optional[datetime] = None
     active: bool = True
     profile_name: Optional[str] = None
     avatar_url: Optional[str] = None
