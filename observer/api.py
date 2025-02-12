@@ -36,33 +36,24 @@ class DotaAPI:
         self.last_request_time = now
 
     async def get_player_matches(self, account_id: int) -> List[Dict[str, Any]]:
-        """Get all matches for a player using pagination."""
+        """Get all matches for a player."""
         await self._rate_limit()
         url = f"{self.base_url}/players/{account_id}/matches"
-        all_matches = []
-        offset = 0
-        batch_size = 100
         
-        while True:
-            try:
-                self.logger.info(f"Fetching matches for player {account_id} (offset: {offset})")
-                async with self.session.get(url, params={"offset": offset}) as response:
-                    if response.status == 429:
-                        raise RateLimitError("OpenDota API rate limit exceeded")
-                    if response.status != 200:
-                        raise DotaAPIError(f"Failed to get player matches: {response.status}")
-                    
-                    matches = await response.json()
-                    if not matches:  # No more matches
-                        self.logger.info(f"Total matches found for player {account_id}: {len(all_matches)}")
-                        return all_matches
-                    
-                    all_matches.extend(matches)
-                    offset += batch_size
-                    await asyncio.sleep(1)  # Rate limiting
-                    
-            except aiohttp.ClientError as e:
-                raise DotaAPIError(f"API request failed: {e}")
+        try:
+            self.logger.info(f"Fetching all matches for player {account_id}")
+            async with self.session.get(url) as response:
+                if response.status == 429:
+                    raise RateLimitError("OpenDota API rate limit exceeded")
+                if response.status != 200:
+                    raise DotaAPIError(f"Failed to get player matches: {response.status}")
+                
+                matches = await response.json()
+                self.logger.info(f"Total matches found for player {account_id}: {len(matches)}")
+                return matches
+                
+        except aiohttp.ClientError as e:
+            raise DotaAPIError(f"API request failed: {e}")
 
     async def get_match_details(self, match_id: int) -> Dict[str, Any]:
         """Get detailed information about a specific match."""
