@@ -3,6 +3,7 @@ import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
 import logging
+import json
 from typing import Optional, Dict, Any, List
 from datetime import datetime
 
@@ -46,13 +47,24 @@ class Database:
             cursor.execute("SELECT 1 FROM matches WHERE match_id = ?", (match_id,))
             return cursor.fetchone() is not None
 
-    def add_player(self, account_id: int) -> Player:
+    def add_player(self, account_id: int, player_info: Dict[str, Any]) -> Player:
         """Add a player to monitor."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
+            profile = player_info.get("profile", {})
             cursor.execute(
-                "INSERT INTO players (account_id) VALUES (?)",
-                (account_id,)
+                """INSERT INTO players (
+                    account_id, profile_name, avatar_url, rank_tier,
+                    leaderboard_rank, profile_data
+                ) VALUES (?, ?, ?, ?, ?, ?)""",
+                (
+                    account_id,
+                    profile.get("personaname"),
+                    profile.get("avatarfull"),
+                    player_info.get("rank_tier"),
+                    player_info.get("leaderboard_rank"),
+                    json.dumps(player_info)
+                )
             )
             conn.commit()
             return self.get_player(account_id)
@@ -66,21 +78,36 @@ class Database:
                 (account_id,)
             )
             row = cursor.fetchone()
-            return Player(**dict(row)) if row else None
+            if not row:
+                return None
+                
+            data = dict(row)
+            if data.get('profile_data'):
+                data['profile_data'] = json.loads(data['profile_data'])
+            return Player(**data)
 
     def get_active_players(self) -> List[Player]:
         """Get all active players."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM players WHERE active = TRUE")
-            return [Player(**dict(row)) for row in cursor.fetchall()]
+            players = []
+            for row in cursor.fetchall():
+                data = dict(row)
+                if data.get('profile_data'):
+                    data['profile_data'] = json.loads(data['profile_data'])
+                players.append(Player(**data))
+            return players
 
     def remove_player(self, account_id: int):
         """Soft delete a player."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
-                "UPDATE players SET active = FALSE, updated_at = ? WHERE account_id = ?",
+                """UPDATE players 
+                SET active = FALSE, 
+                    updated_at = ?
+                WHERE account_id = ?""",
                 (datetime.now(), account_id)
             )
             conn.commit()

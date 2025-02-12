@@ -33,5 +33,13 @@ CREATE TABLE IF NOT EXISTS players (
     account_id INTEGER PRIMARY KEY,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    active BOOLEAN DEFAULT TRUE
+    active BOOLEAN DEFAULT TRUE,
+    profile_name TEXT,
+    avatar_url TEXT,
+    rank_tier INTEGER,
+    leaderboard_rank INTEGER,
+    profile_data JSON
 );
+
+CREATE INDEX IF NOT EXISTS idx_players_profile_name 
+ON players(profile_name);

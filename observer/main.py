@@ -39,9 +39,15 @@ class MatchObserver:
     async def initialize_player(self, account_id: int):
         """Initialize a new player's match history."""
         try:
+            # Fetch player info
+            player_info = await self.api.get_player_info(account_id)
+            
             # Add player to database
-            player = self.db.add_player(account_id)
-            self.logger.info(f"Added player {account_id}")
+            player = self.db.add_player(account_id, player_info)
+            self.logger.info(
+                f"Added player {account_id} "
+                f"({player_info.get('profile', {}).get('personaname', 'Unknown')})"
+            )
             
             # Fetch and queue matches
             matches = await self.api.get_player_matches(account_id)

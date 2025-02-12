@@ -49,3 +49,8 @@ class Player:
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     active: bool = True
+    profile_name: Optional[str] = None
+    avatar_url: Optional[str] = None
+    rank_tier: Optional[int] = None
+    leaderboard_rank: Optional[int] = None
+    profile_data: Optional[dict] = None
