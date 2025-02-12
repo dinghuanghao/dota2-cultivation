@@ -6,7 +6,7 @@ from typing import List, Dict, Any, Optional
 import logging
 import time
 from .exceptions import DotaAPIError, RateLimitError, MatchNotFoundError
-from .models import Match, PlayerMatch
+from .models import Match
 
 
 class DotaAPI:
