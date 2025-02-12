@@ -29,3 +29,13 @@ class PlayerMatch:
     xp_per_min: int
     last_hits: int
     denies: int
+
+
+@dataclass
+class QueueItem:
+    """Represents a match in the processing queue."""
+    match_id: int
+    added_at: float
+    retry_count: int = 0
+    last_retry: Optional[float] = None
+    priority: int = 0  # Higher = more priority
