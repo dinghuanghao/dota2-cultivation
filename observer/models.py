@@ -5,9 +5,8 @@ from datetime import datetime, date
 
 
 @dataclass
-from typing import List, Optional, Dict, Any
-@dataclass
 class Match:
+    """Represents a Dota 2 match."""
     match_id: int
     start_time: int
     duration: int
