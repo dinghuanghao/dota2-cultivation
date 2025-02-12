@@ -1,12 +1,13 @@
 """Data models for the Dota 2 match observer."""
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from datetime import datetime, date
 
 
 @dataclass
+from typing import List, Optional, Dict, Any
+@dataclass
 class Match:
-    """Represents a Dota 2 match."""
     match_id: int
     start_time: int
     duration: int
@@ -14,6 +15,7 @@ class Match:
     radiant_win: bool
     radiant_score: int
     dire_score: int
+    match_data: Optional[dict] = None
 
 
 @dataclass
