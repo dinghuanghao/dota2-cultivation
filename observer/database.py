@@ -3,9 +3,10 @@ import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
 import logging
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
+from datetime import datetime
 
-from .models import Match, PlayerMatch
+from .models import Match, PlayerMatch, Player
 
 
 class Database:
@@ -44,6 +45,45 @@ class Database:
             cursor = conn.cursor()
             cursor.execute("SELECT 1 FROM matches WHERE match_id = ?", (match_id,))
             return cursor.fetchone() is not None
+
+    def add_player(self, account_id: int) -> Player:
+        """Add a player to monitor."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "INSERT INTO players (account_id) VALUES (?)",
+                (account_id,)
+            )
+            conn.commit()
+            return self.get_player(account_id)
+
+    def get_player(self, account_id: int) -> Optional[Player]:
+        """Get a player by account ID."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT * FROM players WHERE account_id = ?",
+                (account_id,)
+            )
+            row = cursor.fetchone()
+            return Player(**dict(row)) if row else None
+
+    def get_active_players(self) -> List[Player]:
+        """Get all active players."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM players WHERE active = TRUE")
+            return [Player(**dict(row)) for row in cursor.fetchall()]
+
+    def remove_player(self, account_id: int):
+        """Soft delete a player."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "UPDATE players SET active = FALSE, updated_at = ? WHERE account_id = ?",
+                (datetime.now(), account_id)
+            )
+            conn.commit()
 
     def store_match(self, match: Match, player_matches: list[PlayerMatch]):
         """Store a match and its player data."""

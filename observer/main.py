@@ -29,15 +29,34 @@ class MatchObserver:
         )
         self.filters = [LastThreeMonthsFilter()]
 
+    def get_players(self) -> List[int]:
+        """Get list of active player IDs to monitor."""
+        players = self.db.get_active_players()
+        return [p.account_id for p in players]
 
 
-    def load_player_list(self) -> List[int]:
-        """Load the list of player IDs to monitor."""
+
+    async def initialize_player(self, account_id: int):
+        """Initialize a new player's match history."""
         try:
-            with open(self.config.PLAYER_LIST_PATH) as f:
-                return json.load(f)
+            # Add player to database
+            player = self.db.add_player(account_id)
+            self.logger.info(f"Added player {account_id}")
+            
+            # Fetch and queue matches
+            matches = await self.api.get_player_matches(account_id)
+            filtered_matches = self.filter_matches(matches)
+            
+            self.logger.info(
+                f"Found {len(filtered_matches)} matches to process "
+                f"out of {len(matches)} total matches for player {account_id}"
+            )
+            
+            for match in filtered_matches:
+                if not self.db.is_match_stored(match["match_id"]):
+                    self.queue_manager.add_match(match["match_id"], priority=1)
         except Exception as e:
-            self.logger.error(f"Failed to load player list: {e}")
+            self.logger.error(f"Failed to initialize player {account_id}: {e}")
             raise
 
     async def process_match(self, match_id: int):
@@ -96,36 +115,16 @@ class MatchObserver:
     async def initialize_detail_queue(self):
         """Initialize the detail queue with matches from all players."""
         try:
-            players = self.load_player_list()
-            current_time = int(time.time())
-            recent_cutoff = current_time - (30 * 24 * 60 * 60)  # 30 days for priority
-            
+            players = self.get_players()
             for player_id in players:
-                self.logger.info(f"Fetching initial matches for player {player_id}")
-                matches = await self.api.get_player_matches(player_id)
-                filtered_matches = self.filter_matches(matches)
-                
-                self.logger.info(
-                    f"Found {len(filtered_matches)} matches to process "
-                    f"out of {len(matches)} total matches for player {player_id}"
-                )
-                
-                for match in filtered_matches:
-                    if not self.db.is_match_stored(match["match_id"]):
-                        # Prioritize matches from last 30 days
-                        priority = 1 if match.get("start_time", 0) > recent_cutoff else 0
-                        self.queue_manager.add_match(match["match_id"], priority=priority)
-                        
+                await self.initialize_player(player_id)
         except Exception as e:
             self.logger.error(f"Error initializing detail queue: {e}")
 
     async def check_new_matches(self):
         """Check for new matches from all players."""
         try:
-            players = self.load_player_list()
-            current_time = int(time.time())
-            recent_cutoff = current_time - (30 * 24 * 60 * 60)  # 30 days for priority
-            
+            players = self.get_players()
             for player_id in players:
                 self.logger.info(f"Checking new matches for player {player_id}")
                 matches = await self.api.get_player_matches(player_id, limit=50)
@@ -134,11 +133,10 @@ class MatchObserver:
                 for match in filtered_matches:
                     if not self.db.is_match_stored(match["match_id"]):
                         # New matches get high priority
-                        priority = 2 if match.get("start_time", 0) > recent_cutoff else 1
-                        self.queue_manager.add_match(match["match_id"], priority=priority)
+                        self.queue_manager.add_match(match["match_id"], priority=2)
                         self.logger.info(
                             f"Added new match {match['match_id']} to queue "
-                            f"with priority {priority}"
+                            f"with priority 2"
                         )
                 
         except Exception as e:

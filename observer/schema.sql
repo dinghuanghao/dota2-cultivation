@@ -28,3 +28,10 @@ CREATE TABLE IF NOT EXISTS player_matches (
 
 CREATE INDEX IF NOT EXISTS idx_player_matches_account 
 ON player_matches(account_id);
+
+CREATE TABLE IF NOT EXISTS players (
+    account_id INTEGER PRIMARY KEY,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    active BOOLEAN DEFAULT TRUE
+);

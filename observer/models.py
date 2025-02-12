@@ -1,6 +1,7 @@
 """Data models for the Dota 2 match observer."""
 from dataclasses import dataclass
 from typing import List, Optional
+from datetime import datetime
 
 
 @dataclass
@@ -39,3 +40,12 @@ class QueueItem:
     retry_count: int = 0
     last_retry: Optional[float] = None
     priority: int = 0  # Higher = more priority
+
+
+@dataclass
+class Player:
+    """Represents a monitored player."""
+    account_id: int
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+    active: bool = True
