@@ -119,6 +119,7 @@ class DatabaseAPI:
         """
         self._validate_account_id(account_id)
         self._validate_pagination(limit, offset)
+        
         with self.db.get_connection() as conn:
             cursor = conn.cursor()
             
@@ -317,6 +318,7 @@ class DatabaseAPI:
         """
         self._validate_account_id(account_id)
         self._validate_pagination(limit, offset)
+        
         with self.db.get_connection() as conn:
             cursor = conn.cursor()
             
