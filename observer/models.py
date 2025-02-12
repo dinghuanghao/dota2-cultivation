@@ -11,9 +11,12 @@ class Match:
     start_time: int
     duration: int
     game_mode: int
-    radiant_win: bool
-    radiant_score: int
-    dire_score: int
+    game_mode_name: Optional[str] = None
+    lobby_type: int = 0
+    lobby_type_name: Optional[str] = None
+    leagueid: int = 0
+    radiant_win: bool = False
+    radiant_score: int = 0
     match_data: Optional[dict] = None
 
 

@@ -120,9 +120,12 @@ class MatchObserver:
                 start_time=start_time,
                 duration=match_data.get("duration", 0),
                 game_mode=match_data.get("game_mode", 0),
+                game_mode_name=match_data.get("game_mode_name"),
+                lobby_type=match_data.get("lobby_type", 0),
+                lobby_type_name=None,  # Not provided by API
+                leagueid=match_data.get("leagueid", 0),
                 radiant_win=bool(match_data.get("radiant_win", False)),
                 radiant_score=match_data.get("radiant_score", 0),
-                dire_score=match_data.get("dire_score", 0),
                 match_data=match_data
             )
             

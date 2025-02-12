@@ -175,12 +175,14 @@ class Database:
                 cursor.execute("""
                     INSERT INTO matches (
                         match_id, start_time, duration, game_mode,
-                        radiant_win, radiant_score, dire_score, match_data
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        game_mode_name, lobby_type, lobby_type_name, leagueid,
+                        radiant_win, radiant_score, match_data
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     match.match_id, match.start_time, match.duration,
-                    match.game_mode, match.radiant_win, match.radiant_score,
-                    match.dire_score, json.dumps(match.match_data) if match.match_data else None
+                    match.game_mode, match.game_mode_name, match.lobby_type,
+                    match.lobby_type_name, match.leagueid, match.radiant_win,
+                    match.radiant_score, json.dumps(match.match_data) if match.match_data else None
                 ))
 
                 # Store player match data
