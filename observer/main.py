@@ -47,6 +47,10 @@ class MatchObserver:
 
         try:
             match_data = await self.api.get_match_details(match_id)
+            start_time = match_data.get("start_time", 0)
+            match_date = datetime.fromtimestamp(start_time).strftime('%Y-%m-%d %H:%M:%S')
+            self.logger.info(f"Fetching details for match {match_id} (played on {match_date})")
+            
             player_matches = []
             for player in match_data.get("players", []):
                 player_matches.append(PlayerMatch(
@@ -65,7 +69,7 @@ class MatchObserver:
             
             match = Match(
                 match_id=match_id,
-                start_time=match_data.get("start_time", 0),
+                start_time=start_time,
                 duration=match_data.get("duration", 0),
                 game_mode=match_data.get("game_mode", 0),
                 radiant_win=bool(match_data.get("radiant_win", False)),
