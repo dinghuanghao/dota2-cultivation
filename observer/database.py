@@ -7,7 +7,7 @@ import logging
 from typing import Optional, Dict, Any, List
 from datetime import datetime
 
-from .models import Match, PlayerMatch, Player
+from .models import Match, Player
 
 
 class Database:
@@ -166,8 +166,8 @@ class Database:
             )
             conn.commit()
 
-    def store_match(self, match: Match, player_matches: list[PlayerMatch]):
-        """Store a match and its player data."""
+    def store_match(self, match: Match):
+        """Store a match and update player match_ids."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
             try:
@@ -175,30 +175,30 @@ class Database:
                 cursor.execute("""
                     INSERT INTO matches (
                         match_id, start_time, duration, game_mode,
-                        radiant_win, radiant_score, dire_score, match_data
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        game_mode_name, lobby_type, lobby_type_name, leagueid,
+                        radiant_win, radiant_score, match_data
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     match.match_id, match.start_time, match.duration,
-                    match.game_mode, match.radiant_win, match.radiant_score,
-                    match.dire_score, json.dumps(match.match_data) if match.match_data else None
+                    match.game_mode, match.game_mode_name, match.lobby_type,
+                    match.lobby_type_name, match.leagueid, match.radiant_win,
+                    match.radiant_score, json.dumps(match.match_data) if match.match_data else None
                 ))
 
-                # Store player match data
-                for player_match in player_matches:
-                    cursor.execute("""
-                        INSERT INTO player_matches (
-                            match_id, account_id, hero_id, player_slot,
-                            kills, deaths, assists, gold_per_min,
-                            xp_per_min, last_hits, denies
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """, (
-                        player_match.match_id, player_match.account_id,
-                        player_match.hero_id, player_match.player_slot,
-                        player_match.kills, player_match.deaths,
-                        player_match.assists, player_match.gold_per_min,
-                        player_match.xp_per_min, player_match.last_hits,
-                        player_match.denies
-                    ))
+                # Update player match_ids
+                for player in match.match_data.get("players", []):
+                    account_id = player.get("account_id", 0)
+                    if account_id > 0:
+                        cursor.execute("""
+                            UPDATE players 
+                            SET match_ids = json_insert(
+                                COALESCE(match_ids, '[]'),
+                                '$[' || json_array_length(COALESCE(match_ids, '[]')) || ']',
+                                ?
+                            )
+                            WHERE account_id = ?
+                        """, (match.match_id, account_id))
+
                 conn.commit()
             except Exception as e:
                 conn.rollback()

@@ -10,7 +10,7 @@ from pathlib import Path
 from .config import Config
 from .database import Database
 from .api import DotaAPI
-from .models import Match, PlayerMatch
+from .models import Match
 from .exceptions import DotaAPIError, RateLimitError, MatchNotFoundError
 from .queue import QueueManager
 from .filters import LastThreeMonthsFilter
@@ -99,34 +99,21 @@ class MatchObserver:
             match_date = datetime.fromtimestamp(start_time).strftime('%Y-%m-%d %H:%M:%S')
             self.logger.info(f"Fetching details for match {match_id} (played on {match_date})")
             
-            player_matches = []
-            for player in match_data.get("players", []):
-                player_matches.append(PlayerMatch(
-                    match_id=match_id,
-                    account_id=player.get("account_id", 0),
-                    hero_id=player.get("hero_id", 0),
-                    player_slot=player.get("player_slot", 0),
-                    kills=player.get("kills", 0),
-                    deaths=player.get("deaths", 0),
-                    assists=player.get("assists", 0),
-                    gold_per_min=player.get("gold_per_min", 0),
-                    xp_per_min=player.get("xp_per_min", 0),
-                    last_hits=player.get("last_hits", 0),
-                    denies=player.get("denies", 0)
-                ))
-            
             match = Match(
                 match_id=match_id,
                 start_time=start_time,
                 duration=match_data.get("duration", 0),
                 game_mode=match_data.get("game_mode", 0),
+                game_mode_name=match_data.get("game_mode_name"),
+                lobby_type=match_data.get("lobby_type", 0),
+                lobby_type_name=None,  # Not provided by API
+                leagueid=match_data.get("leagueid", 0),
                 radiant_win=bool(match_data.get("radiant_win", False)),
                 radiant_score=match_data.get("radiant_score", 0),
-                dire_score=match_data.get("dire_score", 0),
                 match_data=match_data
             )
             
-            self.db.store_match(match, player_matches)
+            self.db.store_match(match)
             self.logger.info(f"Stored match {match_id}")
         except MatchNotFoundError:
             self.logger.warning(f"Match {match_id} not found")

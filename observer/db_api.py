@@ -33,7 +33,7 @@ from datetime import datetime
 from pathlib import Path
 
 from .database import Database
-from .models import Player, Match, PlayerMatch
+from .models import Player, Match
 from .config import Config
 
 
@@ -126,9 +126,8 @@ class DatabaseAPI:
             # Get total count
             count_query = """
                 SELECT COUNT(*) as total
-                FROM matches m
-                JOIN player_matches pm ON m.match_id = pm.match_id
-                WHERE pm.account_id = ?
+                FROM matches m, json_each(m.match_data, '$.players') as p
+                WHERE json_extract(p.value, '$.account_id') = ?
             """
             count_params = [account_id]
             
@@ -147,15 +146,14 @@ class DatabaseAPI:
                     m.duration,
                     m.game_mode,
                     m.radiant_win,
-                    pm.hero_id,
-                    pm.kills,
-                    pm.deaths,
-                    pm.assists,
-                    pm.gold_per_min,
-                    pm.xp_per_min
-                FROM matches m
-                JOIN player_matches pm ON m.match_id = pm.match_id
-                WHERE pm.account_id = ?
+                    json_extract(p.value, '$.hero_id') as hero_id,
+                    json_extract(p.value, '$.kills') as kills,
+                    json_extract(p.value, '$.deaths') as deaths,
+                    json_extract(p.value, '$.assists') as assists,
+                    json_extract(p.value, '$.gold_per_min') as gold_per_min,
+                    json_extract(p.value, '$.xp_per_min') as xp_per_min
+                FROM matches m, json_each(m.match_data, '$.players') as p
+                WHERE json_extract(p.value, '$.account_id') = ?
             """
             params = [account_id]
             
@@ -238,14 +236,15 @@ class DatabaseAPI:
                 SELECT 
                     COUNT(*) as total_matches,
                     SUM(CASE 
-                        WHEN (pm.player_slot < 128 AND m.radiant_win) OR
-                             (pm.player_slot >= 128 AND NOT m.radiant_win)
+                        WHEN (CAST(json_extract(p.value, '$.player_slot') AS INTEGER) < 128 AND m.radiant_win) OR
+                             (CAST(json_extract(p.value, '$.player_slot') AS INTEGER) >= 128 AND NOT m.radiant_win)
                         THEN 1 ELSE 0 END) as wins,
-                    AVG(CAST(pm.kills + pm.assists AS FLOAT) / 
-                        CASE WHEN pm.deaths = 0 THEN 1 ELSE pm.deaths END) as avg_kda
-                FROM matches m
-                JOIN player_matches pm ON m.match_id = pm.match_id
-                WHERE {where_clause}
+                    AVG(CAST(CAST(json_extract(p.value, '$.kills') AS INTEGER) + 
+                           CAST(json_extract(p.value, '$.assists') AS INTEGER) AS FLOAT) / 
+                        CASE WHEN CAST(json_extract(p.value, '$.deaths') AS INTEGER) = 0 
+                        THEN 1 ELSE CAST(json_extract(p.value, '$.deaths') AS INTEGER) END) as avg_kda
+                FROM matches m, json_each(m.match_data, '$.players') as p
+                WHERE json_extract(p.value, '$.account_id') = ?
             """
             cursor.execute(stats_query, params)
             stats = dict(cursor.fetchone())
@@ -257,21 +256,20 @@ class DatabaseAPI:
             # Get hero stats
             hero_query = f"""
                 SELECT 
-                    pm.hero_id,
+                    CAST(json_extract(p.value, '$.hero_id') AS INTEGER) as hero_id,
                     COUNT(*) as games,
                     SUM(CASE 
-                        WHEN (pm.player_slot < 128 AND m.radiant_win) OR
-                             (pm.player_slot >= 128 AND NOT m.radiant_win)
+                        WHEN (CAST(json_extract(p.value, '$.player_slot') AS INTEGER) < 128 AND m.radiant_win) OR
+                             (CAST(json_extract(p.value, '$.player_slot') AS INTEGER) >= 128 AND NOT m.radiant_win)
                         THEN 1 ELSE 0 END) as wins,
-                    AVG(pm.kills) as avg_kills,
-                    AVG(pm.deaths) as avg_deaths,
-                    AVG(pm.assists) as avg_assists,
-                    AVG(pm.gold_per_min) as avg_gpm,
-                    AVG(pm.xp_per_min) as avg_xpm
-                FROM matches m
-                JOIN player_matches pm ON m.match_id = pm.match_id
-                WHERE {where_clause}
-                GROUP BY pm.hero_id
+                    AVG(CAST(json_extract(p.value, '$.kills') AS INTEGER)) as avg_kills,
+                    AVG(CAST(json_extract(p.value, '$.deaths') AS INTEGER)) as avg_deaths,
+                    AVG(CAST(json_extract(p.value, '$.assists') AS INTEGER)) as avg_assists,
+                    AVG(CAST(json_extract(p.value, '$.gold_per_min') AS INTEGER)) as avg_gpm,
+                    AVG(CAST(json_extract(p.value, '$.xp_per_min') AS INTEGER)) as avg_xpm
+                FROM matches m, json_each(m.match_data, '$.players') as p
+                WHERE json_extract(p.value, '$.account_id') = ?
+                GROUP BY json_extract(p.value, '$.hero_id')
                 ORDER BY games DESC
             """
             cursor.execute(hero_query, params)
@@ -343,10 +341,16 @@ class DatabaseAPI:
             # Get total count
             count_query = f"""
                 SELECT COUNT(*) as total
-                FROM matches m
-                JOIN player_matches pm ON m.match_id = pm.match_id
-                WHERE {where_clause}
+                FROM matches m, json_each(m.match_data, '$.players') as p
+                WHERE json_extract(p.value, '$.account_id') = ?
             """
+            if start_time is not None:
+                count_query += " AND m.start_time >= ?"
+            if game_mode is not None:
+                count_query += " AND m.game_mode = ?"
+            if hero_id is not None:
+                count_query += " AND CAST(json_extract(p.value, '$.hero_id') AS INTEGER) = ?"
+            
             cursor.execute(count_query, params)
             total = cursor.fetchone()['total']
             
@@ -358,17 +362,22 @@ class DatabaseAPI:
                     m.duration,
                     m.game_mode,
                     m.radiant_win,
-                    pm.hero_id,
-                    pm.kills,
-                    pm.deaths,
-                    pm.assists,
-                    pm.gold_per_min,
-                    pm.xp_per_min
-                FROM matches m
-                JOIN player_matches pm ON m.match_id = pm.match_id
-                WHERE {where_clause}
-                ORDER BY m.start_time DESC
+                    json_extract(p.value, '$.hero_id') as hero_id,
+                    json_extract(p.value, '$.kills') as kills,
+                    json_extract(p.value, '$.deaths') as deaths,
+                    json_extract(p.value, '$.assists') as assists,
+                    json_extract(p.value, '$.gold_per_min') as gold_per_min,
+                    json_extract(p.value, '$.xp_per_min') as xp_per_min
+                FROM matches m, json_each(m.match_data, '$.players') as p
+                WHERE json_extract(p.value, '$.account_id') = ?
             """
+            if start_time is not None:
+                query += " AND m.start_time >= ?"
+            if game_mode is not None:
+                query += " AND m.game_mode = ?"
+            if hero_id is not None:
+                query += " AND CAST(json_extract(p.value, '$.hero_id') AS INTEGER) = ?"
+            query += " ORDER BY m.start_time DESC"
             
             if limit is not None:
                 query += " LIMIT ?"

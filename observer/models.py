@@ -11,26 +11,13 @@ class Match:
     start_time: int
     duration: int
     game_mode: int
-    radiant_win: bool
-    radiant_score: int
-    dire_score: int
+    game_mode_name: Optional[str] = None
+    lobby_type: int = 0
+    lobby_type_name: Optional[str] = None
+    leagueid: int = 0
+    radiant_win: bool = False
+    radiant_score: int = 0
     match_data: Optional[dict] = None
-
-
-@dataclass
-class PlayerMatch:
-    """Represents a player's performance in a match."""
-    match_id: int
-    account_id: int
-    hero_id: int
-    player_slot: int
-    kills: int
-    deaths: int
-    assists: int
-    gold_per_min: int
-    xp_per_min: int
-    last_hits: int
-    denies: int
 
 
 @dataclass
@@ -56,3 +43,4 @@ class Player:
     rank_tier: Optional[int] = None
     leaderboard_rank: Optional[int] = None
     profile_data: Optional[dict] = None
+    match_ids: Optional[List[int]] = None
