@@ -27,15 +27,15 @@ CREATE TABLE IF NOT EXISTS players(
     match_ids JSON
 );
 
+-- Create indexes after tables
 CREATE INDEX IF NOT EXISTS idx_players_profile_name 
 ON players(profile_name);
 
-CREATE INDEXIF NOT EXISTS idx_matches_game_mode 
+CREATE INDEX IF NOT EXISTS idx_matches_game_mode 
 ON matches(game_mode);
 
 CREATE INDEX IF NOT EXISTS idx_matches_lobby_type 
 ON matches(lobby_type);
-
 
 CREATE INDEX IF NOT EXISTS idx_matches_start_time 
 ON matches(start_time DESC);
