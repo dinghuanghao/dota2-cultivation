@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS matches (
     radiant_win BOOLEAN NOT NULL,
     radiant_score INTEGER NOT NULL,
     dire_score INTEGER NOT NULL,
+    match_data JSON,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

@@ -122,7 +122,8 @@ class MatchObserver:
                 game_mode=match_data.get("game_mode", 0),
                 radiant_win=bool(match_data.get("radiant_win", False)),
                 radiant_score=match_data.get("radiant_score", 0),
-                dire_score=match_data.get("dire_score", 0)
+                dire_score=match_data.get("dire_score", 0),
+                match_data=match_data
             )
             
             self.db.store_match(match, player_matches)
