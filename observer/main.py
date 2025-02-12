@@ -4,8 +4,9 @@ import json
 import logging
 import time
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, Dict, Any, Callable
 from pathlib import Path
+from collections import deque
 
 from .config import Config
 from .database import Database
@@ -22,6 +23,17 @@ class MatchObserver:
         self.db = Database(config.DATABASE_PATH)
         self.api = DotaAPI(config.OPENDOTA_BASE_URL, config.MATCH_DETAILS_URL)
         self.logger = logging.getLogger(__name__)
+        self.detail_queue = deque()  # Queue for matches needing details
+        self.match_filters: List[Callable[[Dict[str, Any]], bool]] = [
+            self.filter_last_three_months
+        ]
+
+    @staticmethod
+    def filter_last_three_months(match: Dict[str, Any]) -> bool:
+        """Filter matches from the last three months."""
+        current_time = int(time.time())
+        three_months_ago = current_time - (90 * 24 * 60 * 60)  # 90 days in seconds
+        return match.get('start_time', 0) >= three_months_ago
 
     def load_player_list(self) -> List[int]:
         """Load the list of player IDs to monitor."""
@@ -72,47 +84,88 @@ class MatchObserver:
         except Exception as e:
             self.logger.error(f"Error processing match {match_id}: {e}")
 
-    async def process_player_matches(self, account_id: int):
-        """Process recent matches for a player."""
+    def filter_matches(self, matches: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Apply all registered filters to matches."""
+        filtered_matches = matches
+        for filter_func in self.match_filters:
+            filtered_matches = [m for m in filtered_matches if filter_func(m)]
+        return filtered_matches
+
+    async def initialize_detail_queue(self):
+        """Initialize the detail queue with matches from all players."""
         try:
-            self.logger.info(f"Fetching matches for player {account_id}")
-            matches = await self.api.get_player_matches(account_id)
-            total_matches = len(matches)
-            
-            # Filter matches from last 3 months
-            current_time = int(time.time())
-            three_months_ago = current_time - (90 * 24 * 60 * 60)  # 90 days in seconds
-            recent_matches = [
-                match for match in matches 
-                if match.get('start_time', 0) >= three_months_ago
-            ]
-            
-            self.logger.info(
-                f"Found {len(recent_matches)} matches within last 3 months "
-                f"out of {total_matches} total matches for player {account_id}"
-            )
-            
-            for match in recent_matches:
-                self.logger.info(f"Processing match {match['match_id']}")
-                await self.process_match(match["match_id"])
+            players = self.load_player_list()
+            for player_id in players:
+                self.logger.info(f"Fetching initial matches for player {player_id}")
+                matches = await self.api.get_player_matches(player_id)
+                filtered_matches = self.filter_matches(matches)
                 
-        except RateLimitError:
-            self.logger.warning("Rate limit reached, waiting before retry")
-            await asyncio.sleep(self.config.RETRY_DELAY)
+                self.logger.info(
+                    f"Found {len(filtered_matches)} matches to process "
+                    f"out of {len(matches)} total matches for player {player_id}"
+                )
+                
+                for match in filtered_matches:
+                    if not self.db.is_match_stored(match["match_id"]):
+                        self.detail_queue.append(match["match_id"])
+                        
         except Exception as e:
-            self.logger.error(f"Error processing player {account_id}: {e}")
+            self.logger.error(f"Error initializing detail queue: {e}")
+
+    async def check_new_matches(self):
+        """Check for new matches from all players."""
+        try:
+            players = self.load_player_list()
+            for player_id in players:
+                self.logger.info(f"Checking new matches for player {player_id}")
+                matches = await self.api.get_player_matches(player_id, limit=50)
+                filtered_matches = self.filter_matches(matches)
+                
+                for match in filtered_matches:
+                    if not self.db.is_match_stored(match["match_id"]):
+                        self.detail_queue.append(match["match_id"])
+                        self.logger.info(f"Added new match {match['match_id']} to queue")
+                
+        except Exception as e:
+            self.logger.error(f"Error checking new matches: {e}")
+
+    async def process_detail_queue(self):
+        """Process matches in the detail queue."""
+        while self.detail_queue:
+            match_id = self.detail_queue.popleft()
+            try:
+                self.logger.info(f"Processing match {match_id} from queue")
+                await self.process_match(match_id)
+            except Exception as e:
+                self.logger.error(f"Error processing match {match_id}: {e}")
+                # Add back to queue on failure
+                self.detail_queue.append(match_id)
 
     async def run(self):
         """Main run loop."""
-        while True:
-            try:
-                players = self.load_player_list()
-                for player_id in players:
-                    await self.process_player_matches(player_id)
-                    await asyncio.sleep(self.config.POLLING_INTERVAL)
-            except Exception as e:
-                self.logger.error(f"Error in main loop: {e}")
-                await asyncio.sleep(self.config.RETRY_DELAY)
+        try:
+            # Initialize API session
+            await self.api.init()
+            
+            # Initial load of all matches
+            await self.initialize_detail_queue()
+            
+            while True:
+                # Process any matches in the queue
+                while self.detail_queue:
+                    await self.process_detail_queue()
+                
+                # Check for new matches
+                await self.check_new_matches()
+                
+                # Wait before next check
+                await asyncio.sleep(self.config.POLLING_INTERVAL)
+                
+        except Exception as e:
+            self.logger.error(f"Error in main loop: {e}")
+            await asyncio.sleep(self.config.RETRY_DELAY)
+        finally:
+            await self.cleanup()
 
     async def cleanup(self):
         """Cleanup resources."""

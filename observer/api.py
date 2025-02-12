@@ -35,14 +35,19 @@ class DotaAPI:
             await asyncio.sleep(self.min_request_interval)
         self.last_request_time = now
 
-    async def get_player_matches(self, account_id: int) -> List[Dict[str, Any]]:
-        """Get all matches for a player."""
+    async def get_player_matches(self, account_id: int, limit: Optional[int] = None) -> List[Dict[str, Any]]:
+        """Get matches for a player. If limit is None, fetches all matches."""
         await self._rate_limit()
         url = f"{self.base_url}/players/{account_id}/matches"
+        params = {"limit": limit} if limit is not None else {}
         
         try:
-            self.logger.info(f"Fetching all matches for player {account_id}")
-            async with self.session.get(url) as response:
+            if limit:
+                self.logger.info(f"Fetching latest {limit} matches for player {account_id}")
+            else:
+                self.logger.info(f"Fetching all matches for player {account_id}")
+                
+            async with self.session.get(url, params=params) as response:
                 if response.status == 429:
                     raise RateLimitError("OpenDota API rate limit exceeded")
                 if response.status != 200:
