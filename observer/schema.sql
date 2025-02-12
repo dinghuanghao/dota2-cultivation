@@ -44,3 +44,12 @@ CREATE TABLE IF NOT EXISTS players (
 
 CREATE INDEX IF NOT EXISTS idx_players_profile_name 
 ON players(profile_name);
+
+CREATE INDEX IF NOT EXISTS idx_player_matches_hero 
+ON player_matches(hero_id);
+
+CREATE INDEX IF NOT EXISTS idx_matches_game_mode 
+ON matches(game_mode);
+
+CREATE INDEX IF NOT EXISTS idx_matches_start_time 
+ON matches(start_time DESC);
