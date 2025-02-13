@@ -47,9 +47,42 @@ class MatchPlayer:
     aghanims_shard: int = 0
     morale_score: Optional[int] = None
     imp_score: Optional[int] = None
+    imp: Optional[int] = None
+    imp_name: Optional[str] = None
+    kda: Optional[float] = None
+    damage_rate: Optional[float] = None
+    fight_rate: Optional[float] = None
+    gold_rate: Optional[float] = None
+    mvp: bool = False
+    honor: bool = False
+    nickname: Optional[str] = None
+    label1: Optional[str] = None
+    label2: Optional[str] = None
+    label3: Optional[str] = None
     rank: Optional[int] = None
     rank_change: Optional[int] = None
+    previous_rank: Optional[int] = None
+    rankNumber: Optional[int] = None
     party_id: Optional[int] = None
+    partyNum: Optional[int] = None
+    hero_variant: Optional[int] = None
+    innateAbility: List[str] = field(default_factory=list)
+    facet: Optional[Dict[str, Any]] = None
+    overperformance_score: Optional[int] = None
+    heroIcon: Optional[str] = None
+    lineExperience: Optional[int] = None
+    lineGold: Optional[int] = None
+    assistantGold: Optional[int] = None
+    damageGoldRate: Optional[float] = None
+    campsStacked: Optional[int] = None
+    deathGold: Optional[int] = None
+    deathTime: Optional[int] = None
+    damageBear: Optional[int] = None
+    expPercent: Optional[int] = None
+    top1: List[int] = field(default_factory=list)
+    top2: List[int] = field(default_factory=list)
+    top3: List[int] = field(default_factory=list)
+    proPlayer: bool = False
     ability_upgrades: List[Dict[str, Any]] = field(default_factory=list)
 
 
@@ -128,8 +161,41 @@ class Match:
                 imp_score=p.get('imp_score'),
                 rank=p.get('rank'),
                 rank_change=p.get('rank_change'),
+                previous_rank=p.get('previous_rank'),
+                rankNumber=p.get('rankNumber'),
                 party_id=p.get('party_id'),
-                ability_upgrades=p.get('ability_upgrades', [])
+                partyNum=p.get('partyNum'),
+                hero_variant=p.get('hero_variant'),
+                innateAbility=p.get('innateAbility', []),
+                facet=p.get('facet'),
+                overperformance_score=p.get('overperformance_score'),
+                heroIcon=p.get('heroIcon'),
+                lineExperience=p.get('lineExperience'),
+                lineGold=p.get('lineGold'),
+                assistantGold=p.get('assistantGold'),
+                damageGoldRate=p.get('damageGoldRate'),
+                campsStacked=p.get('campsStacked'),
+                deathGold=p.get('deathGold'),
+                deathTime=p.get('deathTime'),
+                damageBear=p.get('damageBear'),
+                expPercent=p.get('expPercent'),
+                top1=p.get('top1', []),
+                top2=p.get('top2', []),
+                top3=p.get('top3', []),
+                proPlayer=bool(p.get('proPlayer', False)),
+                ability_upgrades=p.get('ability_upgrades', []),
+                imp=p.get('imp'),
+                imp_name=p.get('imp_name'),
+                kda=p.get('kda'),
+                damage_rate=p.get('damage_rate'),
+                fight_rate=p.get('fight_rate'),
+                gold_rate=p.get('gold_rate'),
+                mvp=bool(p.get('mvp', False)),
+                honor=bool(p.get('honor', False)),
+                nickname=p.get('nickname'),
+                label1=p.get('label1'),
+                label2=p.get('label2'),
+                label3=p.get('label3')
             ))
         
         return cls(
