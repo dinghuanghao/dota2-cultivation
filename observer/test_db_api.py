@@ -1,6 +1,7 @@
 """Test script for database API."""
 from observer.db_api import DatabaseAPI
 from observer.database import Database
+from observer.models import Match, MatchPlayer
 from pathlib import Path
 
 def test_api():
@@ -16,17 +17,23 @@ def test_api():
     print("Default player test passed")
 
     # Test pagination
-    matches = api.get_player_matches(455681834)
-    assert len(matches['matches']) <= 10
+    total, matches = api.get_player_matches(455681834)
+    assert len(matches) <= 10
+    if matches:
+        assert isinstance(matches[0], Match)
+        assert isinstance(matches[0].players[0], MatchPlayer)
     print("Pagination test passed")
 
     # Test filtering
-    filtered = api.get_player_matches_filtered(
+    total, filtered_matches = api.get_player_matches_filtered(
         455681834,
         game_mode=1,
         hero_id=1
     )
-    print(f"Found {filtered['total']} matches with game_mode={1} and hero_id={1}")
+    if filtered_matches:
+        assert isinstance(filtered_matches[0], Match)
+        assert isinstance(filtered_matches[0].players[0], MatchPlayer)
+    print(f"Found {total} matches with game_mode={1} and hero_id={1}")
 
 if __name__ == '__main__':
     test_api()
