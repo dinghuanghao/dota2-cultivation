@@ -36,6 +36,12 @@ class Database:
                 schema = f.read()
             with self.get_connection() as conn:
                 conn.executescript(schema)
+                
+            # Add default player if not exists
+            default_account_id = 455681834
+            if not self.get_player(default_account_id):
+                self.add_player(default_account_id, {})
+                self.logger.info(f"Added default player {default_account_id}")
         except Exception as e:
             self.logger.error(f"Failed to initialize database: {e}")
             raise
