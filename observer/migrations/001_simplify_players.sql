@@ -1,21 +1,31 @@
 -- Migration script to preserve personaname and simplify players table
-CREATE TABLE IF NOT EXISTS players_new (
+PRAGMA foreign_keys=off;
+
+-- Create new table
+CREATE TABLE players_new (
     account_id INTEGER PRIMARY KEY,
     personaname TEXT,
     match_ids JSON
 );
 
--- Copy data if old table exists
+-- Only try to copy data if old table exists and has the expected columns
 INSERT OR IGNORE INTO players_new (account_id, personaname, match_ids)
-SELECT account_id, COALESCE(profile_name, 'Unknown'), match_ids
-FROM players
-WHERE EXISTS (
-    SELECT 1 FROM sqlite_master 
-    WHERE type='table' AND name='players'
+SELECT p.account_id, 
+       COALESCE(p.profile_name, 'Unknown') as personaname,
+       p.match_ids
+FROM sqlite_master m
+JOIN players p
+WHERE m.type = 'table' 
+AND m.name = 'players'
+AND EXISTS (
+    SELECT 1 FROM pragma_table_info('players') 
+    WHERE name = 'profile_name'
 );
 
 -- Drop old table if it exists
 DROP TABLE IF EXISTS players;
 
--- Rename new table to players
+-- Rename new table
 ALTER TABLE players_new RENAME TO players;
+
+PRAGMA foreign_keys=on;
