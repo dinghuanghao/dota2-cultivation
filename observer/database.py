@@ -58,45 +58,15 @@ class Database:
         with self.get_connection() as conn:
             cursor = conn.cursor()
             profile = player_info.get("profile", {})
+            personaname = profile.get("personaname", "Unknown")
             
-            # Try to update existing player first
             cursor.execute(
-                """UPDATE players 
-                SET profile_name = ?,
-                    avatar_url = ?,
-                    rank_tier = ?,
-                    leaderboard_rank = ?,
-                    profile_data = ?,
-                    updated_at = ?,
-                    active = TRUE
-                WHERE account_id = ?""",
-                (
-                    profile.get("personaname"),
-                    profile.get("avatarfull"),
-                    player_info.get("rank_tier"),
-                    player_info.get("leaderboard_rank"),
-                    json.dumps(player_info),
-                    datetime.now(),
-                    account_id
-                )
+                """INSERT INTO players (account_id, personaname)
+                VALUES (?, ?)
+                ON CONFLICT(account_id) DO UPDATE SET
+                personaname = ?""",
+                (account_id, personaname, personaname)
             )
-            
-            # If no rows were updated, insert new player
-            if cursor.rowcount == 0:
-                cursor.execute(
-                    """INSERT INTO players (
-                        account_id, profile_name, avatar_url, rank_tier,
-                        leaderboard_rank, profile_data
-                    ) VALUES (?, ?, ?, ?, ?, ?)""",
-                    (
-                        account_id,
-                        profile.get("personaname"),
-                        profile.get("avatarfull"),
-                        player_info.get("rank_tier"),
-                        player_info.get("leaderboard_rank"),
-                        json.dumps(player_info)
-                    )
-                )
             
             conn.commit()
             return self.get_player(account_id)
