@@ -50,6 +50,7 @@ class MatchPlayer:
     rank: Optional[int] = None
     rank_change: Optional[int] = None
     party_id: Optional[int] = None
+    ability_upgrades: List[Dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass
@@ -127,7 +128,8 @@ class Match:
                 imp_score=p.get('imp_score'),
                 rank=p.get('rank'),
                 rank_change=p.get('rank_change'),
-                party_id=p.get('party_id')
+                party_id=p.get('party_id'),
+                ability_upgrades=p.get('ability_upgrades', [])
             ))
         
         return cls(
