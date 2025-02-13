@@ -1,26 +1,21 @@
 -- Migration script to preserve personaname and simplify players table
-ALTER TABLE players ADD COLUMN temp_personaname TEXT;
-
--- Preserve personaname from either profile_name or profile_data
-UPDATE players 
-SET temp_personaname = COALESCE(
-    profile_name,
-    json_extract(profile_data, '$.profile.personaname'),
-    'Unknown'
-);
-
--- Create new table with simplified schema
-CREATE TABLE players_new (
+CREATE TABLE IF NOT EXISTS players_new (
     account_id INTEGER PRIMARY KEY,
     personaname TEXT,
     match_ids JSON
 );
 
--- Copy data to new table
-INSERT INTO players_new 
-SELECT account_id, temp_personaname, match_ids 
-FROM players;
+-- Copy data if old table exists
+INSERT OR IGNORE INTO players_new (account_id, personaname, match_ids)
+SELECT account_id, COALESCE(profile_name, 'Unknown'), match_ids
+FROM players
+WHERE EXISTS (
+    SELECT 1 FROM sqlite_master 
+    WHERE type='table' AND name='players'
+);
 
--- Replace old table
-DROP TABLE players;
+-- Drop old table if it exists
+DROP TABLE IF EXISTS players;
+
+-- Rename new table to players
 ALTER TABLE players_new RENAME TO players;
