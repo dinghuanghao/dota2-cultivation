@@ -43,18 +43,13 @@ class MatchObserver:
                 
             # Check if update is needed
             now = datetime.now()
-            if (player.last_profile_update and 
-                (now - player.last_profile_update).total_seconds() < 
-                self.config.PROFILE_UPDATE_INTERVAL):
-                return
+            # No need to rate limit profile updates since we only store personaname
                 
-            # Update profile
+            # Update personaname
             player_info = await self.api.get_player_info(account_id)
-            self.db.update_player_profile(account_id, player_info)
-            self.logger.info(
-                f"Updated profile for player {account_id} "
-                f"({player_info.get('profile', {}).get('personaname', 'Unknown')})"
-            )
+            personaname = player_info.get('profile', {}).get('personaname', 'Unknown')
+            self.db.add_player(account_id, {'profile': {'personaname': personaname}})
+            self.logger.info(f"Updated personaname for player {account_id} ({personaname})")
         except Exception as e:
             self.logger.error(f"Failed to update profile for player {account_id}: {e}")
 

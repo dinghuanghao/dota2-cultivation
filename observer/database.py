@@ -36,6 +36,12 @@ class Database:
                 schema = f.read()
             with self.get_connection() as conn:
                 conn.executescript(schema)
+                
+            # Add default player if not exists
+            default_account_id = 455681834
+            if not self.get_player(default_account_id):
+                self.add_player(default_account_id, {})
+                self.logger.info(f"Added default player {default_account_id}")
         except Exception as e:
             self.logger.error(f"Failed to initialize database: {e}")
             raise
@@ -52,45 +58,15 @@ class Database:
         with self.get_connection() as conn:
             cursor = conn.cursor()
             profile = player_info.get("profile", {})
+            personaname = profile.get("personaname", "Unknown")
             
-            # Try to update existing player first
             cursor.execute(
-                """UPDATE players 
-                SET profile_name = ?,
-                    avatar_url = ?,
-                    rank_tier = ?,
-                    leaderboard_rank = ?,
-                    profile_data = ?,
-                    updated_at = ?,
-                    active = TRUE
-                WHERE account_id = ?""",
-                (
-                    profile.get("personaname"),
-                    profile.get("avatarfull"),
-                    player_info.get("rank_tier"),
-                    player_info.get("leaderboard_rank"),
-                    json.dumps(player_info),
-                    datetime.now(),
-                    account_id
-                )
+                """INSERT INTO players (account_id, personaname)
+                VALUES (?, ?)
+                ON CONFLICT(account_id) DO UPDATE SET
+                personaname = ?""",
+                (account_id, personaname, personaname)
             )
-            
-            # If no rows were updated, insert new player
-            if cursor.rowcount == 0:
-                cursor.execute(
-                    """INSERT INTO players (
-                        account_id, profile_name, avatar_url, rank_tier,
-                        leaderboard_rank, profile_data
-                    ) VALUES (?, ?, ?, ?, ?, ?)""",
-                    (
-                        account_id,
-                        profile.get("personaname"),
-                        profile.get("avatarfull"),
-                        player_info.get("rank_tier"),
-                        player_info.get("leaderboard_rank"),
-                        json.dumps(player_info)
-                    )
-                )
             
             conn.commit()
             return self.get_player(account_id)
@@ -100,70 +76,26 @@ class Database:
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
-                "SELECT * FROM players WHERE account_id = ?",
+                "SELECT account_id, personaname, match_ids FROM players WHERE account_id = ?",
                 (account_id,)
             )
             row = cursor.fetchone()
             if not row:
                 return None
-                
-            data = dict(row)
-            if data.get('profile_data'):
-                data['profile_data'] = json.loads(data['profile_data'])
-            return Player(**data)
+            return Player(**dict(row))
 
     def get_active_players(self) -> List[Player]:
-        """Get all active players."""
+        """Get all players."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM players WHERE active = TRUE")
-            players = []
-            for row in cursor.fetchall():
-                data = dict(row)
-                if data.get('profile_data'):
-                    data['profile_data'] = json.loads(data['profile_data'])
-                players.append(Player(**data))
-            return players
+            cursor.execute("SELECT account_id, personaname, match_ids FROM players")
+            return [Player(**dict(row)) for row in cursor.fetchall()]
 
     def remove_player(self, account_id: int):
-        """Soft delete a player."""
+        """Remove a player."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(
-                """UPDATE players 
-                SET active = FALSE, 
-                    updated_at = ?
-                WHERE account_id = ?""",
-                (datetime.now(), account_id)
-            )
-            conn.commit()
-
-    def update_player_profile(self, account_id: int, player_info: Dict[str, Any]):
-        """Update player profile information."""
-        with self.get_connection() as conn:
-            cursor = conn.cursor()
-            profile = player_info.get("profile", {})
-            cursor.execute(
-                """UPDATE players 
-                SET profile_name = ?,
-                    avatar_url = ?,
-                    rank_tier = ?,
-                    leaderboard_rank = ?,
-                    profile_data = ?,
-                    last_profile_update = ?,
-                    updated_at = ?
-                WHERE account_id = ?""",
-                (
-                    profile.get("personaname"),
-                    profile.get("avatarfull"),
-                    player_info.get("rank_tier"),
-                    player_info.get("leaderboard_rank"),
-                    json.dumps(player_info),
-                    datetime.now(),
-                    datetime.now(),
-                    account_id
-                )
-            )
+            cursor.execute("DELETE FROM players WHERE account_id = ?", (account_id,))
             conn.commit()
 
     def store_match(self, match: Match):
