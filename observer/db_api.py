@@ -82,7 +82,7 @@ class DatabaseAPI:
     def remove_player(self, account_id: int) -> None:
         """Remove a player from monitoring.
         
-        This sets the player's active status to False but preserves their match data.
+        This removes the player from monitoring.
         
         Args:
             account_id: The player's account ID
