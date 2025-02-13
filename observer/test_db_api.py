@@ -1,9 +1,19 @@
 """Test script for database API."""
 from observer.db_api import DatabaseAPI
+from observer.database import Database
+from pathlib import Path
 
 def test_api():
     """Test database API functionality."""
     api = DatabaseAPI()
+    db = Database(Path(__file__).parent / "matches.db")
+
+    # Test default player exists
+    default_player = db.get_player(455681834)
+    assert default_player is not None, "Default player should exist"
+    assert default_player.account_id == 455681834
+    assert default_player.personaname is not None
+    print("Default player test passed")
 
     # Test pagination
     matches = api.get_player_matches(455681834)
