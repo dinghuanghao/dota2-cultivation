@@ -28,12 +28,13 @@ Example usage:
     api.remove_player(123456789)  # Preserves match history
 """
 import time
-from typing import List, Optional, Dict, Any
+import json
+from typing import List, Optional, Dict, Any, Tuple
 from datetime import datetime
 from pathlib import Path
 
 from .database import Database
-from .models import Player, Match
+from .models import Player, Match, MatchPlayer
 from .config import Config
 
 
@@ -99,7 +100,7 @@ class DatabaseAPI:
         start_time: Optional[int] = None,
         limit: Optional[int] = None,
         offset: Optional[int] = None
-    ) -> Dict[str, Any]:
+    ) -> Tuple[int, List[Match]]:
         """Get matches for a player with pagination.
         
         Args:
@@ -110,9 +111,9 @@ class DatabaseAPI:
             offset: Number of matches to skip
             
         Returns:
-            Dictionary containing:
-            - total: Total number of matches
-            - matches: List of match dictionaries
+            A tuple containing:
+            - Total number of matches
+            - List of Match objects
             
         Raises:
             ValueError: If account_id is invalid or pagination parameters are invalid
@@ -141,17 +142,28 @@ class DatabaseAPI:
             # Get matches
             query = """
                 SELECT 
-                    m.match_id,
-                    m.start_time,
-                    m.duration,
-                    m.game_mode,
-                    m.radiant_win,
+                    m.*,
                     json_extract(p.value, '$.hero_id') as hero_id,
+                    json_extract(p.value, '$.hero_img') as hero_img,
+                    json_extract(p.value, '$.hero_name') as hero_name,
+                    json_extract(p.value, '$.hero_name_zh') as hero_name_zh,
+                    json_extract(p.value, '$.player_slot') as player_slot,
                     json_extract(p.value, '$.kills') as kills,
                     json_extract(p.value, '$.deaths') as deaths,
                     json_extract(p.value, '$.assists') as assists,
+                    json_extract(p.value, '$.last_hits') as last_hits,
+                    json_extract(p.value, '$.denies') as denies,
                     json_extract(p.value, '$.gold_per_min') as gold_per_min,
-                    json_extract(p.value, '$.xp_per_min') as xp_per_min
+                    json_extract(p.value, '$.xp_per_min') as xp_per_min,
+                    json_extract(p.value, '$.level') as level,
+                    json_extract(p.value, '$.hero_damage') as hero_damage,
+                    json_extract(p.value, '$.tower_damage') as tower_damage,
+                    json_extract(p.value, '$.hero_healing') as hero_healing,
+                    json_extract(p.value, '$.net_worth') as net_worth,
+                    json_extract(p.value, '$.gold') as gold,
+                    json_extract(p.value, '$.gold_spent') as gold_spent,
+                    json_extract(p.value, '$.steam_id64') as steam_id64,
+                    json_extract(p.value, '$.ability_upgrades') as ability_upgrades
                 FROM matches m, json_each(m.match_data, '$.players') as p
                 WHERE json_extract(p.value, '$.account_id') = ?
             """
@@ -174,24 +186,55 @@ class DatabaseAPI:
             cursor.execute(query, params)
             matches = []
             for row in cursor.fetchall():
-                matches.append({
-                    'match_id': row['match_id'],
-                    'start_time': row['start_time'],
-                    'duration': row['duration'],
-                    'game_mode': row['game_mode'],
-                    'radiant_win': bool(row['radiant_win']),
-                    'hero_id': row['hero_id'],
-                    'kills': row['kills'],
-                    'deaths': row['deaths'],
-                    'assists': row['assists'],
-                    'gold_per_min': row['gold_per_min'],
-                    'xp_per_min': row['xp_per_min']
-                })
+                player = MatchPlayer(
+                    hero_id=row['hero_id'],
+                    hero_img=row['hero_img'] or "",
+                    hero_name=row['hero_name'] or "",
+                    hero_name_zh=row['hero_name_zh'] or "",
+                    player_slot=row['player_slot'] or 0,
+                    kills=row['kills'] or 0,
+                    deaths=row['deaths'] or 0,
+                    assists=row['assists'] or 0,
+                    last_hits=row['last_hits'] or 0,
+                    denies=row['denies'] or 0,
+                    account_id=account_id,
+                    steam_id64=row['steam_id64'] or "",
+                    level=row['level'] or 0,
+                    gold_per_min=row['gold_per_min'] or 0,
+                    xp_per_min=row['xp_per_min'] or 0,
+                    hero_damage=row['hero_damage'] or 0,
+                    tower_damage=row['tower_damage'] or 0,
+                    hero_healing=row['hero_healing'] or 0,
+                    net_worth=row['net_worth'] or 0,
+                    gold=row['gold'] or 0,
+                    gold_spent=row['gold_spent'] or 0,
+                    ability_upgrades=json.loads(row['ability_upgrades']) if row['ability_upgrades'] else []
+                )
+                
+                match = Match(
+                    match_id=row['match_id'],
+                    start_time=row['start_time'],
+                    duration=row['duration'],
+                    game_mode=row['game_mode'],
+                    game_mode_name=row['game_mode_name'],
+                    lobby_type=row['lobby_type'] or 0,
+                    leagueid=row['leagueid'] or 0,
+                    radiant_win=bool(row['radiant_win']),
+                    radiant_score=row['radiant_score'] or 0,
+                    dire_score=row['dire_score'] or 0,
+                    match_seq_num=row['match_seq_num'],
+                    cluster=row['cluster'],
+                    first_blood_time=row['first_blood_time'],
+                    human_players=row['human_players'] or 10,
+                    radiant_team_id=row['radiant_team_id'],
+                    dire_team_id=row['dire_team_id'],
+                    radiant_team_name=row['radiant_team_name'],
+                    dire_team_name=row['dire_team_name'],
+                    players=[player]
+                )
+                matches.append(match)
             
-            return {
-                'total': total,
-                'matches': matches
-            }
+            return total, matches
             
     def get_player_stats(
         self,
@@ -295,7 +338,7 @@ class DatabaseAPI:
         hero_id: Optional[int] = None,
         limit: Optional[int] = None,
         offset: Optional[int] = None
-    ) -> Dict[str, Any]:
+    ) -> Tuple[int, List[Match]]:
         """Get filtered matches for a player with pagination.
         
         Args:
@@ -307,9 +350,9 @@ class DatabaseAPI:
             offset: Number of matches to skip
             
         Returns:
-            Dictionary containing:
-            - total: Total number of matches matching filters
-            - matches: List of filtered match dictionaries
+            A tuple containing:
+            - Total number of matches matching filters
+            - List of Match objects
             
         Raises:
             ValueError: If account_id is invalid or pagination parameters are invalid
@@ -320,54 +363,65 @@ class DatabaseAPI:
         with self.db.get_connection() as conn:
             cursor = conn.cursor()
             
-            # Build WHERE clause and params
-            where_clauses = ["pm.account_id = ?"]
             params = [account_id]
             
             if start_time is not None:
-                where_clauses.append("m.start_time >= ?")
                 params.append(start_time)
                 
             if game_mode is not None:
-                where_clauses.append("m.game_mode = ?")
                 params.append(game_mode)
                 
             if hero_id is not None:
-                where_clauses.append("pm.hero_id = ?")
                 params.append(hero_id)
-                
-            where_clause = " AND ".join(where_clauses)
             
             # Get total count
-            count_query = f"""
+            count_query = """
                 SELECT COUNT(*) as total
                 FROM matches m, json_each(m.match_data, '$.players') as p
                 WHERE json_extract(p.value, '$.account_id') = ?
             """
+            count_params = [account_id]
+            
             if start_time is not None:
                 count_query += " AND m.start_time >= ?"
+                count_params.append(start_time)
+                
             if game_mode is not None:
                 count_query += " AND m.game_mode = ?"
+                count_params.append(game_mode)
+                
             if hero_id is not None:
                 count_query += " AND CAST(json_extract(p.value, '$.hero_id') AS INTEGER) = ?"
+                count_params.append(hero_id)
             
-            cursor.execute(count_query, params)
+            cursor.execute(count_query, count_params)
             total = cursor.fetchone()['total']
             
             # Get matches
             query = f"""
                 SELECT 
-                    m.match_id,
-                    m.start_time,
-                    m.duration,
-                    m.game_mode,
-                    m.radiant_win,
+                    m.*,
                     json_extract(p.value, '$.hero_id') as hero_id,
+                    json_extract(p.value, '$.hero_img') as hero_img,
+                    json_extract(p.value, '$.hero_name') as hero_name,
+                    json_extract(p.value, '$.hero_name_zh') as hero_name_zh,
+                    json_extract(p.value, '$.player_slot') as player_slot,
                     json_extract(p.value, '$.kills') as kills,
                     json_extract(p.value, '$.deaths') as deaths,
                     json_extract(p.value, '$.assists') as assists,
+                    json_extract(p.value, '$.last_hits') as last_hits,
+                    json_extract(p.value, '$.denies') as denies,
                     json_extract(p.value, '$.gold_per_min') as gold_per_min,
-                    json_extract(p.value, '$.xp_per_min') as xp_per_min
+                    json_extract(p.value, '$.xp_per_min') as xp_per_min,
+                    json_extract(p.value, '$.level') as level,
+                    json_extract(p.value, '$.hero_damage') as hero_damage,
+                    json_extract(p.value, '$.tower_damage') as tower_damage,
+                    json_extract(p.value, '$.hero_healing') as hero_healing,
+                    json_extract(p.value, '$.net_worth') as net_worth,
+                    json_extract(p.value, '$.gold') as gold,
+                    json_extract(p.value, '$.gold_spent') as gold_spent,
+                    json_extract(p.value, '$.steam_id64') as steam_id64,
+                    json_extract(p.value, '$.ability_upgrades') as ability_upgrades
                 FROM matches m, json_each(m.match_data, '$.players') as p
                 WHERE json_extract(p.value, '$.account_id') = ?
             """
@@ -390,21 +444,52 @@ class DatabaseAPI:
             cursor.execute(query, params)
             matches = []
             for row in cursor.fetchall():
-                matches.append({
-                    'match_id': row['match_id'],
-                    'start_time': row['start_time'],
-                    'duration': row['duration'],
-                    'game_mode': row['game_mode'],
-                    'radiant_win': bool(row['radiant_win']),
-                    'hero_id': row['hero_id'],
-                    'kills': row['kills'],
-                    'deaths': row['deaths'],
-                    'assists': row['assists'],
-                    'gold_per_min': row['gold_per_min'],
-                    'xp_per_min': row['xp_per_min']
-                })
+                player = MatchPlayer(
+                    hero_id=row['hero_id'],
+                    hero_img=row['hero_img'] or "",
+                    hero_name=row['hero_name'] or "",
+                    hero_name_zh=row['hero_name_zh'] or "",
+                    player_slot=row['player_slot'] or 0,
+                    kills=row['kills'] or 0,
+                    deaths=row['deaths'] or 0,
+                    assists=row['assists'] or 0,
+                    last_hits=row['last_hits'] or 0,
+                    denies=row['denies'] or 0,
+                    account_id=account_id,
+                    steam_id64=row['steam_id64'] or "",
+                    level=row['level'] or 0,
+                    gold_per_min=row['gold_per_min'] or 0,
+                    xp_per_min=row['xp_per_min'] or 0,
+                    hero_damage=row['hero_damage'] or 0,
+                    tower_damage=row['tower_damage'] or 0,
+                    hero_healing=row['hero_healing'] or 0,
+                    net_worth=row['net_worth'] or 0,
+                    gold=row['gold'] or 0,
+                    gold_spent=row['gold_spent'] or 0,
+                    ability_upgrades=json.loads(row['ability_upgrades']) if row['ability_upgrades'] else []
+                )
+                
+                match = Match(
+                    match_id=row['match_id'],
+                    start_time=row['start_time'],
+                    duration=row['duration'],
+                    game_mode=row['game_mode'],
+                    game_mode_name=row['game_mode_name'],
+                    lobby_type=row['lobby_type'] or 0,
+                    leagueid=row['leagueid'] or 0,
+                    radiant_win=bool(row['radiant_win']),
+                    radiant_score=row['radiant_score'] or 0,
+                    dire_score=row['dire_score'] or 0,
+                    match_seq_num=row['match_seq_num'],
+                    cluster=row['cluster'],
+                    first_blood_time=row['first_blood_time'],
+                    human_players=row['human_players'] or 10,
+                    radiant_team_id=row['radiant_team_id'],
+                    dire_team_id=row['dire_team_id'],
+                    radiant_team_name=row['radiant_team_name'],
+                    dire_team_name=row['dire_team_name'],
+                    players=[player]
+                )
+                matches.append(match)
             
-            return {
-                'total': total,
-                'matches': matches
-            }
+            return total, matches
