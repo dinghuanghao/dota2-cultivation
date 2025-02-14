@@ -35,13 +35,7 @@ def test_api():
         assert isinstance(filtered_matches[0].players[0], MatchPlayer)
     print(f"Found {total} matches with game_mode={1} and hero_id={1}")
 
-    # Test stats
-    stats = api.get_player_stats(455681834)
-    print(f"Total matches: {stats['total_matches']}")
-    win_rate = (stats['wins'] / stats['total_matches'] * 100) if stats['total_matches'] > 0 else 0
-    print(f"Win rate: {win_rate:.1f}%")
-    if stats['heroes']:
-        print(f"Top heroes: {[h['hero_id'] for h in stats['heroes'][:3]]}")
+
 
 if __name__ == '__main__':
     test_api()
